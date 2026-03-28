@@ -11,13 +11,15 @@ import AttendancePage from "./pages/AttendancePage.jsx";
 
 const EnrollmentsPage = React.lazy(() => import("./pages/EnrollmentsPage.jsx"));
 const GradesPage = React.lazy(() => import("./pages/GradesPage.jsx"));
+const AnalyticsPage = React.lazy(() => import("./pages/AnalyticsPage.jsx"));
+const GradeAuditPage = React.lazy(() => import("./pages/GradeAuditPage.jsx"));
 
 export default function App() {
   return (
     <div className="app-shell">
       <NavBar />
       <main className="page">
-        <Suspense fallback={<div className="card">Loading...</div>}>
+        <Suspense fallback={<div className="loading">Loading…</div>}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -29,10 +31,12 @@ export default function App() {
             <Route path="/enrollments" element={<EnrollmentsPage />} />
             <Route path="/grades" element={<GradesPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
+
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/audit" element={<GradeAuditPage />} />
           </Routes>
         </Suspense>
       </main>
     </div>
   );
 }
-

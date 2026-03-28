@@ -311,6 +311,18 @@ app.delete("/enrollments/:id", async (req, res, next) => {
   }
 });
 
+// Update enrollment status (uses update_enrollment_status stored procedure)
+app.put("/enrollments/:id/status", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await pool.execute("CALL update_enrollment_status(?, ?)", [id, status]);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --------------------
 // Grades (update GRADE -> triggers audit + assign_letter_grade)
 // --------------------
@@ -354,6 +366,17 @@ app.put("/grades", async (req, res, next) => {
       [enrollmentId]
     );
     res.json(rows[0] || null);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Bulk assign letter grades for a course (uses bulk_assign_grades procedure)
+app.post("/grades/bulk/:courseId", async (req, res, next) => {
+  try {
+    const { courseId } = req.params;
+    await pool.execute("CALL bulk_assign_grades(?)", [courseId]);
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }
@@ -417,6 +440,123 @@ app.get("/report", async (req, res, next) => {
        FROM student_report_view
        ${where}`,
       params
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --------------------
+// Dashboard summary counts
+// --------------------
+app.get("/dashboard/counts", async (req, res, next) => {
+  try {
+    const [students] = await query("SELECT COUNT(*) AS c FROM STUDENT", []);
+    const [faculty] = await query("SELECT COUNT(*) AS c FROM FACULTY", []);
+    const [courses] = await query("SELECT COUNT(*) AS c FROM COURSE", []);
+    const [enrollments] = await query("SELECT COUNT(*) AS c FROM ENROLLMENT WHERE status = 'active'", []);
+    res.json({
+      students: students?.c ?? 0,
+      faculty: faculty?.c ?? 0,
+      courses: courses?.c ?? 0,
+      enrollments: enrollments?.c ?? 0,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --------------------
+// Analytics endpoints
+// --------------------
+
+// Department statistics (uses dept_statistics_view)
+app.get("/analytics/department-stats", async (req, res, next) => {
+  try {
+    const rows = await query("SELECT * FROM dept_statistics_view", []);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Top students for a course (uses get_top_students stored procedure)
+app.get("/analytics/top-students", async (req, res, next) => {
+  try {
+    const courseId = Number(req.query.courseId) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const [rows] = await pool.execute("CALL get_top_students(?, ?)", [courseId, limit]);
+    res.json(rows[0] || []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Students at risk (uses get_students_at_risk stored procedure)
+app.get("/analytics/at-risk", async (req, res, next) => {
+  try {
+    const minAttendance = Number(req.query.minAttendance) || 75;
+    const minMarks = Number(req.query.minMarks) || 60;
+    const [rows] = await pool.execute("CALL get_students_at_risk(?, ?)", [minAttendance, minMarks]);
+    res.json(rows[0] || []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Course workload summary (uses course_workload_view)
+app.get("/analytics/course-workload", async (req, res, next) => {
+  try {
+    const rows = await query("SELECT * FROM course_workload_view", []);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Student transcript (uses get_student_transcript stored procedure)
+app.get("/analytics/transcript/:studentId", async (req, res, next) => {
+  try {
+    const { studentId } = req.params;
+    const [rows] = await pool.execute("CALL get_student_transcript(?)", [studentId]);
+    res.json(rows[0] || []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --------------------
+// Audit log endpoints
+// --------------------
+
+// Grade audit log
+app.get("/audit/grades", async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT audit_id, grade_id, enrollment_id, student_name, course_code,
+              old_marks, old_letter_grade, new_marks, new_letter_grade, changed_at
+       FROM GRADE_AUDIT_LOG
+       ORDER BY changed_at DESC
+       LIMIT 100`,
+      []
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Enrollment audit log
+app.get("/audit/enrollments", async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT audit_id, enrollment_id, student_id, course_id, student_name,
+              course_code, enrolled_on, old_status, dropped_at
+       FROM ENROLLMENT_AUDIT_LOG
+       ORDER BY dropped_at DESC
+       LIMIT 100`,
+      []
     );
     res.json(rows);
   } catch (err) {

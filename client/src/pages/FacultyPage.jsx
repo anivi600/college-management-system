@@ -23,23 +23,17 @@ export default function FacultyPage() {
     e.preventDefault();
     setError("");
     try {
-      const payload = {
-        name: form.name,
-        email: form.email,
-        deptId: form.deptId,
-      };
-
+      const payload = { name: form.name, email: form.email, deptId: form.deptId };
       if (editingFacultyId) {
         await api.put(`/faculty/${editingFacultyId}`, payload);
       } else {
         await api.post("/faculty", payload);
       }
-
       setEditingFacultyId("");
       setForm({ name: "", email: "", deptId: "" });
       await load();
     } catch (e2) {
-      setError(e2?.response?.data?.error || e2.message || "Failed to create faculty");
+      setError(e2?.response?.data?.error || e2.message || "Failed to save faculty");
     }
   }
 
@@ -54,106 +48,82 @@ export default function FacultyPage() {
   }
 
   return (
-    <div className="card">
-      <h2>Faculty</h2>
-      {error ? <div className="error" style={{ marginBottom: 12 }}>{error}</div> : null}
+    <>
+      <div className="page-header">
+        <h2>Faculty</h2>
+        <p className="page-desc">Manage faculty members — each assigned to a department via FK</p>
+      </div>
 
-      <div className="row">
-        <div className="col">
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>
+            {editingFacultyId ? `Edit Faculty #${editingFacultyId}` : "Add Faculty"}
+          </div>
           <form onSubmit={onSubmit}>
-            {editingFacultyId ? (
-              <div className="hint" style={{ marginBottom: 10 }}>
-                Editing facultyId: <b>{editingFacultyId}</b>
-              </div>
-            ) : null}
             <div className="field">
-              <label>Name</label>
-              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <label htmlFor="faculty-name">Name</label>
+              <input id="faculty-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Full name" required />
             </div>
             <div className="field">
-              <label>Email</label>
-              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              <label htmlFor="faculty-email">Email</label>
+              <input id="faculty-email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="faculty@college.edu" required />
             </div>
             <div className="field">
-              <label>Department</label>
-              <select value={form.deptId} onChange={(e) => setForm((f) => ({ ...f, deptId: e.target.value }))}>
-                <option value="">Select...</option>
+              <label htmlFor="faculty-dept">Department</label>
+              <select id="faculty-dept" value={form.deptId} onChange={(e) => setForm((f) => ({ ...f, deptId: e.target.value }))} required>
+                <option value="">Select department…</option>
                 {deptOptions.map((d) => (
-                  <option key={d.dept_id} value={d.dept_id}>
-                    {d.dept_name}
-                  </option>
+                  <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>
                 ))}
               </select>
             </div>
-            <div className="row" style={{ gap: 10 }}>
-              <button type="submit">{editingFacultyId ? "Update faculty" : "Add faculty"}</button>
-              {editingFacultyId ? (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={() => {
-                    setEditingFacultyId("");
-                    setForm({ name: "", email: "", deptId: "" });
-                  }}
-                >
+            <div className="actions-row">
+              <button type="submit">{editingFacultyId ? "Update Faculty" : "Add Faculty"}</button>
+              {editingFacultyId && (
+                <button type="button" className="secondary" onClick={() => { setEditingFacultyId(""); setForm({ name: "", email: "", deptId: "" }); }}>
                   Cancel
                 </button>
-              ) : null}
+              )}
             </div>
           </form>
         </div>
 
-        <div className="col">
-          <table className="table" aria-label="faculty table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Department</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.faculty_id}>
-                  <td>{r.name}</td>
-                  <td>{r.email}</td>
-                  <td>{r.dept_name}</td>
-                  <td>
-                    <div className="row" style={{ gap: 8 }}>
-                      <button
-                        className="secondary"
-                        onClick={() => {
-                          setEditingFacultyId(r.faculty_id);
-                          setForm({
-                            name: r.name || "",
-                            email: r.email || "",
-                            deptId: r.dept_id ? String(r.dept_id) : "",
-                          });
-                        }}
-                        type="button"
-                      >
-                        Edit
-                      </button>
-                      <button className="danger" onClick={() => remove(r.faculty_id)} type="button">
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!rows.length ? (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>All Faculty</div>
+          <div className="table-wrapper">
+            <table className="table" aria-label="faculty table" id="faculty-table">
+              <thead>
                 <tr>
-                  <td colSpan="4" style={{ color: "var(--muted)" }}>
-                    No faculty found.
-                  </td>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Department</th>
+                  <th>Actions</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.faculty_id}>
+                    <td><strong>{r.name}</strong></td>
+                    <td>{r.email}</td>
+                    <td><span className="badge badge-info">{r.dept_name}</span></td>
+                    <td>
+                      <div className="actions-row">
+                        <button className="secondary" onClick={() => { setEditingFacultyId(r.faculty_id); setForm({ name: r.name || "", email: r.email || "", deptId: r.dept_id ? String(r.dept_id) : "" }); }} type="button">Edit</button>
+                        <button className="danger" onClick={() => remove(r.faculty_id)} type="button">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr><td colSpan="4"><div className="empty-state"><p>No faculty found.</p></div></td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
-

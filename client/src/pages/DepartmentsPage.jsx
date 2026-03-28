@@ -22,9 +22,7 @@ export default function DepartmentsPage() {
       }
     }
     run();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   async function addDepartment(e) {
@@ -34,7 +32,7 @@ export default function DepartmentsPage() {
     try {
       await api.post("/departments", { deptName });
       setDeptName("");
-      setSuccess("Department added.");
+      setSuccess("Department added successfully.");
       const res = await api.get("/departments/overview");
       setRows(res.data || []);
     } catch (err) {
@@ -56,64 +54,72 @@ export default function DepartmentsPage() {
   }
 
   return (
-    <div className="card">
-      <h2>Departmental Overview</h2>
-      {error ? <div className="error" style={{ marginBottom: 12 }}>{error}</div> : null}
-      {success ? <div style={{ color: "var(--accent)", fontWeight: 700, marginBottom: 12 }}>{success}</div> : null}
+    <>
+      <div className="page-header">
+        <h2>Departments</h2>
+        <p className="page-desc">Manage academic departments — the root anchor for faculty, students, and courses</p>
+      </div>
 
-      <form onSubmit={addDepartment} style={{ marginBottom: 14 }}>
-        <div className="row" style={{ alignItems: "flex-end" }}>
-          <div className="col">
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Add Department</div>
+          <form onSubmit={addDepartment}>
             <div className="field">
-              <label>Add Department</label>
+              <label htmlFor="dept-name-input">Department Name</label>
               <input
+                id="dept-name-input"
                 value={deptName}
                 onChange={(e) => setDeptName(e.target.value)}
                 placeholder="e.g., Physics"
                 required
               />
             </div>
-          </div>
-          <div className="col" style={{ minWidth: 160 }}>
-            <button type="submit">Add</button>
+            <button type="submit">Add Department</button>
+          </form>
+        </div>
+
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Overview</div>
+          <div className="table-wrapper">
+            <table className="table" aria-label="department overview table" id="departments-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Students</th>
+                  <th>Faculty</th>
+                  <th>Courses</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.dept_id}>
+                    <td><strong>{r.dept_name}</strong></td>
+                    <td className="data-value">{r.students_count}</td>
+                    <td className="data-value">{r.faculty_count}</td>
+                    <td className="data-value">{r.courses_count}</td>
+                    <td>
+                      <button className="danger" type="button" onClick={() => removeDepartment(r.dept_id)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan="5">
+                      <div className="empty-state"><p>No departments found.</p></div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </form>
-
-      <table className="table" aria-label="department overview table">
-        <thead>
-          <tr>
-            <th>Department</th>
-            <th>Students</th>
-            <th>Faculty</th>
-            <th>Courses</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.dept_id}>
-              <td>{r.dept_name}</td>
-              <td>{r.students_count}</td>
-              <td>{r.faculty_count}</td>
-              <td>{r.courses_count}</td>
-              <td>
-                <button className="danger" type="button" onClick={() => removeDepartment(r.dept_id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {!rows.length ? (
-            <tr>
-              <td colSpan="5" style={{ color: "var(--muted)" }}>
-                No data found.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+      </div>
+    </>
   );
 }
-

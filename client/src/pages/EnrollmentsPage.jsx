@@ -1,12 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../api";
 
+function statusBadge(s) {
+  const cls = s === "active" ? "badge-active" : s === "completed" ? "badge-completed" : "badge-dropped";
+  return <span className={`badge ${cls}`}>{s}</span>;
+}
+
+function gradeBadge(letter) {
+  if (!letter) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+  const l = letter.toLowerCase().replace("+", "");
+  const cls = l === "a" ? "badge-grade-a" : l === "b" ? "badge-grade-b" : l === "c" ? "badge-grade-c" : l === "d" ? "badge-grade-d" : "badge-grade-f";
+  return <span className={`badge ${cls}`}>{letter}</span>;
+}
+
 export default function EnrollmentsPage() {
   const [students, setStudents] = useState([]);
   const [courses, setCourses] = useState([]);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
-
   const [form, setForm] = useState({ studentId: "", courseId: "" });
   const [filterCourseId, setFilterCourseId] = useState("");
 
@@ -36,25 +47,18 @@ export default function EnrollmentsPage() {
       }
     }
     run();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {
     loadEnrollments().catch((e) => setError(e?.response?.data?.error || e.message || "Failed to load"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterCourseId]);
 
   async function enroll(e) {
     e.preventDefault();
     setError("");
     try {
-      await api.post("/enrollments", {
-        studentId: form.studentId,
-        courseId: form.courseId,
-      });
+      await api.post("/enrollments", { studentId: form.studentId, courseId: form.courseId });
       setForm({ studentId: "", courseId: "" });
       await loadEnrollments();
     } catch (e2) {
@@ -72,99 +76,110 @@ export default function EnrollmentsPage() {
     }
   }
 
-  const selectedCourse = useMemo(() => courses.find((c) => String(c.course_id) === String(filterCourseId)), [courses, filterCourseId]);
+  async function updateStatus(enrollmentId, newStatus) {
+    setError("");
+    try {
+      await api.put(`/enrollments/${enrollmentId}/status`, { status: newStatus });
+      await loadEnrollments();
+    } catch (e) {
+      setError(e?.response?.data?.error || e.message || "Failed to update status");
+    }
+  }
 
   return (
-    <div className="card">
-      <h2>Enrollments</h2>
+    <>
+      <div className="page-header">
+        <h2>Enrollments</h2>
+        <p className="page-desc">Enroll students via <code>enroll_student()</code> stored procedure — atomic ACID transaction</p>
+      </div>
 
-      {error ? <div className="error" style={{ marginBottom: 12 }}>{error}</div> : null}
+      {error && <div className="error-message">{error}</div>}
 
-      <div className="row">
-        <div className="col">
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Enroll Student</div>
           <form onSubmit={enroll}>
             <div className="field">
-              <label>Student</label>
-              <select value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))}>
-                <option value="">Select...</option>
+              <label htmlFor="enroll-student">Student</label>
+              <select id="enroll-student" value={form.studentId} onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))} required>
+                <option value="">Select student…</option>
                 {students.map((s) => (
-                  <option key={s.student_id} value={s.student_id}>
-                    {s.name}
-                  </option>
+                  <option key={s.student_id} value={s.student_id}>{s.name}</option>
                 ))}
               </select>
             </div>
             <div className="field">
-              <label>Course</label>
-              <select value={form.courseId} onChange={(e) => setForm((f) => ({ ...f, courseId: e.target.value }))}>
-                <option value="">Select...</option>
+              <label htmlFor="enroll-course">Course</label>
+              <select id="enroll-course" value={form.courseId} onChange={(e) => setForm((f) => ({ ...f, courseId: e.target.value }))} required>
+                <option value="">Select course…</option>
                 {courses.map((c) => (
-                  <option key={c.course_id} value={c.course_id}>
-                    {c.course_code} - {c.title}
-                  </option>
+                  <option key={c.course_id} value={c.course_id}>{c.course_code} — {c.title}</option>
                 ))}
               </select>
             </div>
-            <button type="submit">Enroll student</button>
+            <button type="submit">Enroll Student</button>
           </form>
-        </div>
 
-        <div className="col">
+          <div className="divider" />
+
+          <div className="card-title" style={{ marginBottom: 12 }}>Filter</div>
           <div className="field">
-            <label>Filter enrollments by course</label>
-            <select value={filterCourseId} onChange={(e) => setFilterCourseId(e.target.value)}>
+            <label htmlFor="filter-course">Filter by course</label>
+            <select id="filter-course" value={filterCourseId} onChange={(e) => setFilterCourseId(e.target.value)}>
               <option value="">All courses</option>
               {courses.map((c) => (
-                <option key={c.course_id} value={c.course_id}>
-                  {c.course_code} - {c.title}
-                </option>
+                <option key={c.course_id} value={c.course_id}>{c.course_code} — {c.title}</option>
               ))}
             </select>
           </div>
-          <div className="hint">
-            {selectedCourse ? `Showing enrollments for: ${selectedCourse.course_code}` : "Showing enrollments for: all courses"}
+        </div>
+
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Enrollment Records</div>
+          <div className="table-wrapper">
+            <table className="table" aria-label="enrollments table" id="enrollments-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Course</th>
+                  <th>Status</th>
+                  <th>Enrolled</th>
+                  <th>Marks</th>
+                  <th>Grade</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.enrollment_id}>
+                    <td><strong>{r.student_name}</strong></td>
+                    <td>{r.course_code} — {r.course_title}</td>
+                    <td>{statusBadge(r.status)}</td>
+                    <td>{r.enrolled_on ? new Date(r.enrolled_on).toLocaleDateString() : "—"}</td>
+                    <td className="data-value">{r.marks ?? "—"}</td>
+                    <td>{gradeBadge(r.letter_grade)}</td>
+                    <td>
+                      <div className="actions-row">
+                        {r.status === "active" && (
+                          <button className="secondary" type="button" onClick={() => updateStatus(r.enrollment_id, "completed")}>
+                            Complete
+                          </button>
+                        )}
+                        <button className="danger" type="button" onClick={() => dropEnrollment(r.enrollment_id)}>
+                          Drop
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr><td colSpan="7"><div className="empty-state"><p>No enrollments found.</p></div></td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-
-      <table className="table" aria-label="enrollments table">
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Course</th>
-            <th>Status</th>
-            <th>Enrolled On</th>
-            <th>Marks</th>
-            <th>Letter</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.enrollment_id}>
-              <td>{r.student_name}</td>
-              <td>{r.course_code} - {r.course_title}</td>
-              <td>{r.status}</td>
-              <td>{r.enrolled_on}</td>
-              <td>{r.marks ?? "-"}</td>
-              <td>{r.letter_grade ?? "-"}</td>
-              <td>
-                <button className="danger" type="button" onClick={() => dropEnrollment(r.enrollment_id)}>
-                  Drop
-                </button>
-              </td>
-            </tr>
-          ))}
-          {!rows.length ? (
-            <tr>
-              <td colSpan="7" style={{ color: "var(--muted)" }}>
-                No enrollments found.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+    </>
   );
 }
-
